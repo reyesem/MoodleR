@@ -1,0 +1,765 @@
+---
+title: "Quiz Template"
+date: "Last Updated: `r Sys.Date()`"
+output: html_document
+vignette: >
+  %\VignetteIndexEntry{Quiz Template}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r setup, include=FALSE}
+# Load packages
+library(tidyverse)
+library(broom)
+library(MoodleR)
+```
+
+The `MoodleR` package provides a workflow for authoring Moodle quiz questions using RMarkdown. While there are several advantages of authoring questions in RMarkdown (for example, the creation of graphics and datasets in a familiar environment), the primary advantage that "Calculated" questions can be written which make use of the suite of functions available in `R`. This document explains the template for creating a suite of questions (which would generally be imported to form a "Quiz" in Moodle).
+
+Any text that appears at the top of the document is ignored when developing the quiz. This allows the instructor to place notes regarding the entirety of the quiz that are for their benefit only.
+
+Questions are placed inside of an html `<section>` environment with a `.moodle-question` class. This is most easily done using Quarto's fenced div environments. For example, the following Markdown syntax inside of Quarto would create a Moodle multiple numerical question.
+
+````{markdown}
+::::{.moodle-question qtype='numerical' category='practice/summaries'}
+## Computing the Sample Mean
+The following code can be used to read in a dataset called `practice`.
+
+```{r}
+practice <- tibble(x = c(15, 31, 18, 4, 6, 9))
+```
+
+Report the sample mean of the variable `x`.  Report your answer to 1 decimal place.
+
+:::{.answer tolerance='0.1'}
+`r round(mean(practice$x), 1)`
+:::
+::::
+````
+
+This resulting HTML file that results from rendering the Quarto document allows you to review the questions in a nice layout; then, that HTML file is converted to Moodle XML code using the `html_to_moodle()` function.
+
+> The key to constructing Moodle questions within the Quarto document is to learn the proper options to add for each question and the types of classes/environments each type of question accepts.
+
+The general layout of constructing a Moodle question is shown below:
+
+```{markdown}
+::::{.moodle-question qtype='<question-type>' <question-options>}
+## <question title>
+<question text>
+
+:::{<additional-environments>}
+:::
+::::
+```
+
+There are several question types that are accepted: 
+
+  - description: Passes along information and does not expect any input from student.
+  - essay: Students enter long text information that is graded manually.
+  - multichoice: Multiple choice questions (including "mark all that apply" type questions).
+  - matching: Students match several prompts with a correct response chosen from a list.
+  - ddmatch: Similar to matching, except that instead of answers being chosen from a drop-down list, students can drag-and-drop the answers to match with the prompts.
+  - numerical: Students perform a computation and provide some numeric response.
+  - calculated: The most complicated type of question, this allows you to specify random values so that each student receives a unique version of the same question; students then perform a computation and provide some numeric response.  Several questions can be linked, sharing the same dataset.
+  
+Every question type can accept various options; one that is unique to all question types is the category option:
+
+  - `category = 'category-name'`: Specifies the category in which to place all subsequent questions; this overwrites any previously specified category.  You can specify sub-categores by specifying a path; for example `category = 'parent/sub-category'` creates a category called "sub-category" within the "parent" category.
+  
+Other options are explained within each question type below.  The other item that every question requires is the title of the question, which is specified as a second-level header within the question section.  The actual question title in Moodle will replace all spaces with a hyphen and be all lower case.  That is, the question title goes through the following process:
+
+```{r, echo=TRUE, eval=FALSE}
+title |> 
+  stringr::str_to_lower() |> 
+  stringr::str_replace_all('[:space:]', '-')
+```
+
+
+
+# Calculated Question Example
+
+This section contains the elements necessary to create a Calculated question. The name of this question in Moodle would be "calculated-example." Following the code is what the HTML will look like that contains the question information hidden within the HTML.
+
+````{markdown}
+::::{.moodle-question qtype='calculated'}
+## Calculated Example
+The question text is placed here, with potential R-code included. Wildcards are denoted inside braces.
+
+For example, find the value of {p100}-th percentile of standard Normal distribution. That is, if $Z \sim N(0, 1)$, find $q$ such that $Pr(Z < q) = {p}$. We could include a plot here for kicks and giggles:
+
+```{r}
+#| echo: false
+ggplot(data = tibble(y = 0, x = 0),
+       mapping = aes(x = x, y = y)) +
+  stat_function(fun = dnorm, xlim = c(-3, 3)) +
+  labs(y = NULL, x = "Value of Random Variable") +
+  theme_minimal() +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+```
+
+:::{.general-feedback}
+Place general feedback (like a solution) here.
+
+For example, we can use the `qnorm()` function to obtain this estimate.
+:::
+
+:::{.answer fraction='100' tolerance='0.01'} 
+{soln}
+
+:::{.feedback}
+Feedback specific to the answer above is placed here. This is not required.  You can see we do allow multiple answers if you want to give partial credit.
+:::
+:::
+
+:::{.answer fraction='50' tolerance='0.01'}
+{bad.soln}
+:::
+
+:::{.hint}
+Hints can follow using another `div` tag. This is useful for specifying a question in interactive mode, where the number of attempts is equal to the number of hints + 1.  Hints are not required.
+:::
+
+:::{.hint}
+Multiple hints are allowed.
+:::
+
+:::{.dataset}
+This section is unique to calculated questions, and is the space where the dataset definitions are produced. This text here is ignored, but the `R` code below will create the necessary text for the datasets in the background. The first chunk is separated solely so that the output could optionally be printed.
+
+```{r}
+#| echo: false
+
+# Create Dataset
+# Each column corresponds to a wildcard, each row to a different option.
+# Note, a maximum of 100 rows are allowed by Moodle.
+datasets <- tibble(
+  p = runif(5, min = 0.01, max = 0.99) |> round(2),
+  p100 = 100 * p,
+  soln = qnorm(p) |> round(2),
+  bad.soln = qnorm(p, lower.tail = FALSE) |> round(2)
+)
+
+# (optional) print dataset
+datasets |>
+  knitr::kable()
+```
+
+The following chunk is the key which prints things out and hides them in the output; it is really important to specify the `results: asis` YAML option.
+
+```{r}
+#| echo: false
+#| results: asis
+
+# Create Code
+wildcards_mxml(datasets, shared = TRUE)
+```
+:::
+::::
+````
+
+## What the Output Looks Like
+<section id="calculated-example" class="level2 moodle-question" data-qtype="calculated">
+<h2 class="anchored" data-anchor-id="calculated-example">Calculated Example</h2>
+<p>The question text is placed here, with potential R-code included. Wildcards are denoted inside braces.</p>
+<p>For example, find the value of {p100}-th percentile of standard Normal distribution. That is, if <span class="math inline">\(Z \sim N(0, 1)\)</span>, find <span class="math inline">\(q\)</span> such that <span class="math inline">\(Pr(Z &lt; q) = {p}\)</span>. We could include a plot here for kicks and giggles:</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="temp_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<div class="general-feedback">
+<p>Place general feedback (like a solution) here.</p>
+<p>For example, we can use the <code>qnorm()</code> function to obtain this estimate.</p>
+</div>
+<div class="answer" data-fraction="100" data-tolerance="0.01">
+<p>{soln}</p>
+<div class="feedback">
+<p>Feedback specific to the answer above is placed here. This is not required. You can see we do allow multiple answers if you want to give partial credit.</p>
+</div>
+</div>
+<div class="answer" data-fraction="50" data-tolerance="0.01">
+<p>{bad.soln}</p>
+</div>
+<div class="hint">
+<p>Hints can follow using another <code>div</code> tag. This is useful for specifying a question in interactive mode, where the number of attempts is equal to the number of hints + 1. Hints are not required.</p>
+</div>
+<div class="hint">
+<p>Multiple hints are allowed.</p>
+</div>
+<div class="dataset">
+<p>This section is unique to calculated questions, and is the space where the dataset definitions are produced. This text here is ignored, but the <code>R</code> code below will create the necessary text for the datasets in the background. The first chunk is separated solely so that the output could optionally be printed.</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: right;">p</th>
+<th style="text-align: right;">p100</th>
+<th style="text-align: right;">soln</th>
+<th style="text-align: right;">bad.soln</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0.82</td>
+<td style="text-align: right;">82</td>
+<td style="text-align: right;">0.92</td>
+<td style="text-align: right;">-0.92</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.05</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">-1.64</td>
+<td style="text-align: right;">1.64</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0.39</td>
+<td style="text-align: right;">39</td>
+<td style="text-align: right;">-0.28</td>
+<td style="text-align: right;">0.28</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.70</td>
+<td style="text-align: right;">70</td>
+<td style="text-align: right;">0.52</td>
+<td style="text-align: right;">-0.52</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0.04</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">-1.75</td>
+<td style="text-align: right;">1.75</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>The following chunk is the key which prints things out and hides them in the output; it is really important to specify the <code>results: asis</code> YAML option.</p>
+<div class="dataset_definitions" style="visibility: hidden">
+<dataset_definitions><dataset_definition><status><text>shared</text></status><name><text>p</text></name><type>calculated</type><distribution><text>uniform</text></distribution><minimum><text>0</text></minimum><maximum><text>1</text></maximum><decimals><text>2</text></decimals><itemcount>5</itemcount><dataset_items><dataset_item><number>1</number><value>0.82</value></dataset_item><dataset_item><number>2</number><value>0.05</value></dataset_item><dataset_item><number>3</number><value>0.39</value></dataset_item><dataset_item><number>4</number><value>0.7</value></dataset_item><dataset_item><number>5</number><value>0.04</value></dataset_item></dataset_items><number_of_items>5</number_of_items></dataset_definition><dataset_definition><status><text>shared</text></status><name><text>p100</text></name><type>calculated</type><distribution><text>uniform</text></distribution><minimum><text>0</text></minimum><maximum><text>1</text></maximum><decimals><text>2</text></decimals><itemcount>5</itemcount><dataset_items><dataset_item><number>1</number><value>82</value></dataset_item><dataset_item><number>2</number><value>5</value></dataset_item><dataset_item><number>3</number><value>39</value></dataset_item><dataset_item><number>4</number><value>70</value></dataset_item><dataset_item><number>5</number><value>4</value></dataset_item></dataset_items><number_of_items>5</number_of_items></dataset_definition><dataset_definition><status><text>shared</text></status><name><text>soln</text></name><type>calculated</type><distribution><text>uniform</text></distribution><minimum><text>0</text></minimum><maximum><text>1</text></maximum><decimals><text>2</text></decimals><itemcount>5</itemcount><dataset_items><dataset_item><number>1</number><value>0.92</value></dataset_item><dataset_item><number>2</number><value>-1.64</value></dataset_item><dataset_item><number>3</number><value>-0.28</value></dataset_item><dataset_item><number>4</number><value>0.52</value></dataset_item><dataset_item><number>5</number><value>-1.75</value></dataset_item></dataset_items><number_of_items>5</number_of_items></dataset_definition><dataset_definition><status><text>shared</text></status><name><text>bad.soln</text></name><type>calculated</type><distribution><text>uniform</text></distribution><minimum><text>0</text></minimum><maximum><text>1</text></maximum><decimals><text>2</text></decimals><itemcount>5</itemcount><dataset_items><dataset_item><number>1</number><value>-0.92</value></dataset_item><dataset_item><number>2</number><value>1.64</value></dataset_item><dataset_item><number>3</number><value>0.28</value></dataset_item><dataset_item><number>4</number><value>-0.52</value></dataset_item><dataset_item><number>5</number><value>1.75</value></dataset_item></dataset_items><number_of_items>5</number_of_items></dataset_definition></dataset_definitions>
+</div>
+</div>
+</section>
+
+## Calculated Question Options
+The options for a calculated question include:
+
+  - penalty: The penalty when multiple attempts allowed (default `"0"`).
+  - default-grade: The number of points to award to the question (default `"1"`).
+  - synchronize: An indicator of whether the question/dataset is synchronized with others within the quiz (`"true"` or `"false"`; default `"false"`).
+  
+The above are the most common options; you can also specify options on handling units.  See the Moodle help pages for calculated questions for more on these options; we simply state their default values:
+
+  - unit-grading-type: default `"0"`
+  - unit-penalty: default `"0.1"`
+  - show-units: default `"3"`
+  - units-left: default `"0"`
+  
+In addition, each "answer" given can specify the following options:
+
+  - fraction: amount of credit the question is worth (default `"100"`).
+  - tolerance: amount of tolerance in an answer (default `"0.01"`).
+  - tolerance-type: type of tolerance (`"nominal"`, `"relative"`, `"geometric"`; default `"nominal"`).
+  - correct-answer-format: indicator of whether this is decimals or significant figures (`"decimal"` `"sigfig"`; default `"decimal"`).
+  - correct-answer-length: number of decimals/significant-digits to report in the answer (default `"2"`).
+  
+
+# Synchronized Calculated Question Example
+This question simply illustrates how to link (synchronize) two calculated questions. We simply use the same dataset.
+
+````{markdown}
+::::{.moodle-question qtype='calculated' synchronize='true'}
+## Synchronized Calculated Example
+Now, find $Pr(Z > q)$ where $q$ is the value you computed in the previous question.
+
+:::{.general-feedback}
+Just do $1 - {p}$
+:::
+
+:::{.answer fraction='100'}
+1-{p}
+:::
+
+:::{.dataset}
+The key is to write the same dataset.
+
+```{r}
+#| echo: true
+#| results: asis
+
+wildcards_mxml(datasets, shared = TRUE)
+```
+:::
+::::
+````
+
+## What the Output Looks Like
+
+<section id="synchronized-calculated-question-example" class="level1">
+<h1>Synchronized Calculated Question Example</h1>
+<p>This question simply illustrates how to link (synchronize) two calculated questions. We simply use the same dataset.</p>
+<section id="synchronized-calculated-example" class="level2 moodle-question" data-qtype="calculated" data-synchronize="true">
+<h2 class="anchored" data-anchor-id="synchronized-calculated-example">Synchronized Calculated Example</h2>
+<p>Now, find <span class="math inline">\(Pr(Z &gt; q)\)</span> where <span class="math inline">\(q\)</span> is the value you computed in the previous question.</p>
+<div class="general-feedback">
+<p>Just do <span class="math inline">\(1 - {p}\)</span></p>
+</div>
+<div class="answer" data-fraction="100">
+<p>1-{p}</p>
+</div>
+<div class="dataset">
+<p>The key is to write the same dataset.</p>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">wildcards_mxml</span>(datasets, <span class="at">shared =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<div class="dataset_definitions" style="visibility: hidden">
+<dataset_definitions><dataset_definition><status><text>shared</text></status><name><text>p</text></name><type>calculated</type><distribution><text>uniform</text></distribution><minimum><text>0</text></minimum><maximum><text>1</text></maximum><decimals><text>2</text></decimals><itemcount>5</itemcount><dataset_items><dataset_item><number>1</number><value>0.82</value></dataset_item><dataset_item><number>2</number><value>0.05</value></dataset_item><dataset_item><number>3</number><value>0.39</value></dataset_item><dataset_item><number>4</number><value>0.7</value></dataset_item><dataset_item><number>5</number><value>0.04</value></dataset_item></dataset_items><number_of_items>5</number_of_items></dataset_definition><dataset_definition><status><text>shared</text></status><name><text>p100</text></name><type>calculated</type><distribution><text>uniform</text></distribution><minimum><text>0</text></minimum><maximum><text>1</text></maximum><decimals><text>2</text></decimals><itemcount>5</itemcount><dataset_items><dataset_item><number>1</number><value>82</value></dataset_item><dataset_item><number>2</number><value>5</value></dataset_item><dataset_item><number>3</number><value>39</value></dataset_item><dataset_item><number>4</number><value>70</value></dataset_item><dataset_item><number>5</number><value>4</value></dataset_item></dataset_items><number_of_items>5</number_of_items></dataset_definition><dataset_definition><status><text>shared</text></status><name><text>soln</text></name><type>calculated</type><distribution><text>uniform</text></distribution><minimum><text>0</text></minimum><maximum><text>1</text></maximum><decimals><text>2</text></decimals><itemcount>5</itemcount><dataset_items><dataset_item><number>1</number><value>0.92</value></dataset_item><dataset_item><number>2</number><value>-1.64</value></dataset_item><dataset_item><number>3</number><value>-0.28</value></dataset_item><dataset_item><number>4</number><value>0.52</value></dataset_item><dataset_item><number>5</number><value>-1.75</value></dataset_item></dataset_items><number_of_items>5</number_of_items></dataset_definition><dataset_definition><status><text>shared</text></status><name><text>bad.soln</text></name><type>calculated</type><distribution><text>uniform</text></distribution><minimum><text>0</text></minimum><maximum><text>1</text></maximum><decimals><text>2</text></decimals><itemcount>5</itemcount><dataset_items><dataset_item><number>1</number><value>-0.92</value></dataset_item><dataset_item><number>2</number><value>1.64</value></dataset_item><dataset_item><number>3</number><value>0.28</value></dataset_item><dataset_item><number>4</number><value>-0.52</value></dataset_item><dataset_item><number>5</number><value>1.75</value></dataset_item></dataset_items><number_of_items>5</number_of_items></dataset_definition></dataset_definitions>
+</div>
+</div>
+</section>
+
+# Description Question Example
+This section contains the elements necessary to create a description. These are used to convey information and are therefore quite basic. Any text appearing in this section would be ignored when uploading to Moodle; this is a place to store instructor notes regarding this specific question.
+
+````{markdown}
+::::{.moodle-question qtype='description'}
+## Description Example
+The question text goes here, and it could include `R` code and output, such as a graphic or results of a model:
+
+```{r}
+tidy(lm(speed ~ dist, data = cars)) |>
+  knitr::kable(digits = 3)
+```
+
+:::{.general-feedback}
+Additional feedback could be placed here, but this is rarely necessary and can be left blank.
+:::
+::::
+````
+
+## What the Output Looks Like
+<section id="description-example" class="level2 moodle-question" data-qtype="description">
+<h2 class="anchored" data-anchor-id="description-example">Description Example</h2>
+<p>The question text goes here, and it could include <code>R</code> code and output, such as a graphic or results of a model:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tidy</span>(<span class="fu">lm</span>(speed <span class="sc">~</span> dist, <span class="at">data =</span> cars)) <span class="sc">|&gt;</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">term</th>
+<th style="text-align: right;">estimate</th>
+<th style="text-align: right;">std.error</th>
+<th style="text-align: right;">statistic</th>
+<th style="text-align: right;">p.value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: right;">8.284</td>
+<td style="text-align: right;">0.874</td>
+<td style="text-align: right;">9.474</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">dist</td>
+<td style="text-align: right;">0.166</td>
+<td style="text-align: right;">0.017</td>
+<td style="text-align: right;">9.464</td>
+<td style="text-align: right;">0</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="general-feedback">
+<p>Additional feedback could be placed here, but this is rarely necessary and can be left blank.</p>
+</div>
+</section>
+
+
+# Essay Question Example
+This section contains the elements necessary to create an Essay question. These are used to collect responses to longer open-ended questions.
+
+````{markdown}
+::::{.moodle-question qtype='essay'}
+## Essay Example
+Write out the answer to my question.
+
+
+:::{.general-feedback}
+General feedback.
+:::
+
+:::{.response-template}
+This is a place for you to provide a template to get the student started.
+:::
+
+:::{.grader-info}
+Information for the grader when assessing the provided solution.
+:::
+::::
+````
+
+## What the Output Looks Like
+<section id="essay-example" class="level2 moodle-question" data-qtype="essay">
+<h2 class="anchored" data-anchor-id="essay-example">Essay Example</h2>
+<p>Write out the answer to my question.</p>
+<div class="general-feedback">
+<p>General feedback.</p>
+</div>
+<div class="response-template">
+<p>This is a place for you to provide a template to get the student started.</p>
+</div>
+<div class="grader-info">
+<p>Information for the grader when assessing the provided solution.</p>
+</div>
+</section>
+
+## Essay Options
+Essay questions allow you to specify the following options:
+
+  - default-grade: default `"1"`.
+  - response-format: default `"editor"`
+  - response-required: default `"true"`
+  - response-field-lines: default `"15"`
+  - attachments: default `"false"`
+  - attachments-required: default `"false"`
+
+
+# Matching Question Example
+This section contains the elements necessary to create a Matching question.
+
+````{markdown}
+::::{.moodle-question qtype='matching'}
+## Matching Example
+Here is the primary question text.
+
+:::{.general-feedback}
+Place general feedback (like a solution) here.
+:::
+
+:::{.subquestion}
+This is the quantity that should be listed to match.
+
+:::{.answer}
+This is the value that should match the previous value in sub-question.
+:::
+:::
+
+:::{.subquestion}
+For matching questions, you must provide at least two values and 3 potential matches.
+
+:::{.answer}
+This is the match to the second response.
+:::
+:::
+
+:::{.answer}
+You can give more answers than questions to get distractors to choose from.
+:::
+
+:::{.answer}
+Answers are matched to questions in order.
+:::
+
+:::{.answer}
+Answers must be text only (no markup or R).
+:::
+
+:::{.hint}
+Hints can follow. This is useful for specifying a question in interactive mode, where the number of attempts is equal to the number of hints + 1.
+:::
+::::
+````
+
+## What the Output Looks Like
+<section id="matching-question-example" class="level1">
+<h1>Matching Question Example</h1>
+<p>This section contains the elements necessary to create a Matching question.</p>
+<section id="matching-example" class="level2 moodle-question" data-qtype="matching">
+<h2 class="anchored" data-anchor-id="matching-example">Matching Example</h2>
+<p>Here is the primary question text.</p>
+<div class="general-feedback">
+<p>Place general feedback (like a solution) here.</p>
+</div>
+<div class="subquestion">
+<p>This is the quantity that should be listed to match.</p>
+<div class="answer">
+<p>This is the value that should match the previous value in sub-question.</p>
+</div>
+</div>
+<div class="subquestion">
+<p>For matching questions, you must provide at least two values and 3 potential matches.</p>
+<div class="answer">
+<p>This is the match to the second response.</p>
+</div>
+</div>
+<div class="answer">
+<p>You can give more answers than questions to get distractors to choose from.</p>
+</div>
+<div class="answer">
+<p>Answers are matched to questions in order.</p>
+</div>
+<div class="answer">
+<p>Answers must be text only (no markup or R).</p>
+</div>
+<div class="hint">
+<p>Hints can follow. This is useful for specifying a question in interactive mode, where the number of attempts is equal to the number of hints + 1.</p>
+</div>
+</section>
+
+## Matching Options
+Matching questions have the following options:
+
+  - penalty: default `"0"`
+  - default-grade: default `"1"`
+  - shuffle-answers: default `"true"`
+  
+  
+
+# Drag and Drop Matching Question Example
+This section contains the elements necessary to create a Drag and Drop Matching question, which is only available with [this extension](https://moodle.org/plugins/qtype_ddmatch).
+
+````{markdown}
+::::{.moodle-question qtype='ddmatch'}
+## Drag and Drop Matching Example
+Here is the primary question text.
+
+:::{.general-feedback}
+Place general feedback (like a solution) here.
+:::
+
+
+:::{.subquestion}
+This is the quantity that should be listed to match.
+
+:::{.answer}
+This is the value that should match the previous value in sub-question.
+:::
+:::
+
+:::{.subquestion}
+For matching questions, you must provide at least two values and 3 potential matches.
+
+:::{.answer}
+This is the match to the second response.
+:::
+:::
+
+:::{.answer}
+You can give more answers than questions to get distractors to choose from.
+:::
+
+:::{.answer}
+Answers are matched to questions in order.
+:::
+
+:::{.answer}
+Answers can be HTML (and include R code) unlike regular matching.
+:::
+
+:::{.hint}
+Hints can follow. This is useful for specifying a question in interactive mode, where the number of attempts is equal to the number of hints + 1.
+:::
+::::
+````
+
+## What the Output Looks Like
+<section id="drag-and-drop-matching-question-example" class="level1">
+<h1>Drag and Drop Matching Question Example</h1>
+<p>This section contains the elements necessary to create a Drag and Drop Matching question, which is only available with <a href="https://moodle.org/plugins/qtype_ddmatch">this extension</a>.</p>
+<section id="drag-and-drop-matching-example" class="level2 moodle-question" data-qtype="ddmatch">
+<h2 class="anchored" data-anchor-id="drag-and-drop-matching-example">Drag and Drop Matching Example</h2>
+<p>Here is the primary question text.</p>
+<div class="general-feedback">
+<p>Place general feedback (like a solution) here.</p>
+</div>
+<div class="subquestion">
+<p>This is the quantity that should be listed to match.</p>
+<div class="answer">
+<p>This is the value that should match the previous value in sub-question.</p>
+</div>
+</div>
+<div class="subquestion">
+<p>For matching questions, you must provide at least two values and 3 potential matches.</p>
+<div class="answer">
+<p>This is the match to the second response.</p>
+</div>
+</div>
+<div class="answer">
+<p>You can give more answers than questions to get distractors to choose from.</p>
+</div>
+<div class="answer">
+<p>Answers are matched to questions in order.</p>
+</div>
+<div class="answer">
+<p>Answers can be HTML (and include R code) unlike regular matching.</p>
+</div>
+<div class="hint">
+<p>Hints can follow. This is useful for specifying a question in interactive mode, where the number of attempts is equal to the number of hints + 1.</p>
+</div>
+</section>
+
+## Drag and Drop Options
+Matching questions have the following options:
+
+  - penalty: default `"0"`
+  - default-grade: default `"1"`
+  - shuffle-answers: default `"true"`
+
+
+# Multiple Choice Question Example
+This section contains the elements necessary to create a Multichoice question. These can be single answer questions or "select all that apply" questions. That is determined in the options.
+
+````{markdown}
+::::{.moodle-question qtype='multichoice' single='true'}
+## Multiple Choice Example
+Here is a multiple choice question with a single answer (the first one).
+
+:::{.general-feedback}
+Place general feedback (like a solution) here.
+:::
+
+:::{.answer fraction='100'}
+The correct answer.
+
+:::{.feedback}
+Feedback specific to the answer above is placed here. Multiple answers must be provided. 
+:::
+:::
+
+:::{.answer fraction='0'}
+Wrong answer 1.
+:::
+
+:::{.answer fraction='0'}
+Wrong answer 2.
+:::
+
+:::{.answer fraction='0'}
+Wrong answer 3.
+:::
+
+:::{.hint}
+I will stop with 4 answers since most multiple choice problems do, but you can go further.  Hints can follow. This is useful for specifying a question in interactive mode, where the number of attempts is equal to the number of hints + 1.
+:::
+::::
+````
+
+## What the Output Looks Like
+<section id="multiple-choice-example" class="level2 moodle-question" data-qtype="multichoice" data-single="true">
+<h2 class="anchored" data-anchor-id="multiple-choice-example">Multiple Choice Example</h2>
+<p>Here is a multiple choice question with a single answer (the first one).</p>
+<div class="general-feedback">
+<p>Place general feedback (like a solution) here.</p>
+</div>
+<div class="answer" data-fraction="100">
+<p>The correct answer.</p>
+<div class="feedback">
+<p>Feedback specific to the answer above is placed here. Multiple answers must be provided.</p>
+</div>
+</div>
+<div class="answer" data-fraction="0">
+<p>Wrong answer 1.</p>
+</div>
+<div class="answer" data-fraction="0">
+<p>Wrong answer 2.</p>
+</div>
+<div class="answer" data-fraction="0">
+<p>Wrong answer 3.</p>
+</div>
+<div class="hint">
+<p>I will stop with 4 answers since most multiple choice problems do, but you can go further. Hints can follow. This is useful for specifying a question in interactive mode, where the number of attempts is equal to the number of hints + 1.</p>
+</div>
+</section>
+
+## Multiple Choice Options
+Multiple choice questions can have the following options:
+
+  - penalty: default `"0"`
+  - default-grade: default `"1"`
+  - single: Whether there is a single answer (`"true"`) or "mark all that apply" (`"false"`); default `"true"`.
+  - shuffle-answers: whether to shuffle the order of the answers (default `"true"`).
+  - answer-numbering: default `"abc"`
+  
+
+# Numerical Question Example
+This section contains the elements necessary to create a Numerical question. This differs from a calculated question in that every student sees the same version of this question.  Here, we increased the weight of this question to be worth 2 points.
+
+````{markdown}
+::::{.moodle-question qtype='numerical' default-grade="2"}
+## Numerical Example
+Question text asking for some answer; use the following `R` code to read in the dataset. What is the Pearson Correlation Coefficient describing the linear relationship between the two variables?
+
+```{r}
+#| echo: true
+fake.Data <- tibble(
+  y = c(-0.65, 2.26, 2.32, 4.45, 4.05, 6.46, 6.66, 7.63, 9.01, 10.30),
+  x = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+)
+```
+
+:::{.general-feedback}
+Here is the correct solution:
+
+```{r}
+#| echo: true
+#| eval: false
+cor(fake.Data$x, fake.Data$y)
+```
+:::
+
+:::{.answer fraction='100' tolerance='0.001' correct-answer-length='3'}
+`r round(cor(fake.Data$x, fake.Data$y), 3)`
+
+:::{.feedback}
+Feedback specific to the answer above is placed here. Multiple answers are allowed.
+:::
+:::
+
+:::{.hint}
+Hints can follow. This is useful for specifying a question in interactive mode, where the number of attempts is equal to the number of hints + 1.
+:::
+::::
+````
+
+## What the Output Looks Like
+<section id="numerical-example" class="level2 moodle-question" data-qtype="numerical" data-default-grade="2">
+<h2 class="anchored" data-anchor-id="numerical-example">Numerical Example</h2>
+<p>Question text asking for some answer; use the following <code>R</code> code to read in the dataset. What is the Pearson Correlation Coefficient describing the linear relationship between the two variables?</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fake.Data <span class="ot">&lt;-</span> <span class="fu">tibble</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">y =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="fl">0.65</span>, <span class="fl">2.26</span>, <span class="fl">2.32</span>, <span class="fl">4.45</span>, <span class="fl">4.05</span>, <span class="fl">6.46</span>, <span class="fl">6.66</span>, <span class="fl">7.63</span>, <span class="fl">9.01</span>, <span class="fl">10.30</span>),</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">x =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>, <span class="dv">6</span>, <span class="dv">7</span>, <span class="dv">8</span>, <span class="dv">9</span>, <span class="dv">10</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+</div>
+<div class="general-feedback">
+<p>Here is the correct solution:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cor</span>(fake.Data<span class="sc">$</span>x, fake.Data<span class="sc">$</span>y)</span></code></pre></div>
+</div>
+</div>
+<div class="answer" data-fraction="100" data-tolerance="0.001" data-correct-answer-length="3">
+<p>0.983</p>
+<div class="feedback">
+<p>Feedback specific to the answer above is placed here. Multiple answers are allowed.</p>
+</div>
+</div>
+<div class="hint">
+<p>Hints can follow. This is useful for specifying a question in interactive mode, where the number of attempts is equal to the number of hints + 1.</p>
+</div>
+</section>
+
+## Numerical Options
+Numerical questions have the following options:
+
+  - penalty: default `"0"`
+  - default-grade: default `"1"`
+  - unit-grading-type: default `"0"`
+  - unit-penalty: default `"0"`
+  - show-units: default `"3"`
+  - units-left: default `"0"`

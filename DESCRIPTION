@@ -1,0 +1,30 @@
+Package: MoodleR
+Type: Package
+Title: Author Moodle Questions in RMarkdown
+Version: 0.1.0
+Authors@R: person("Reyes", "Eric", 
+    email = "reyesem@rose-hulman.edu",
+    role = c("aut", "cre"))
+Description: This package allows instructors to author questions in RMarkdown
+    and convert them to Moodle using Moodle XML.  This allows you to bring the
+    flexibility of R into the learning management system.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+Imports: dplyr,
+    magrittr,
+    purrr,
+    rlang,
+    rvest,
+    stringr,
+    tibble,
+    tidyr,
+    tidyselect,
+    xml2
+Depends: R (>= 3.0.1)
+Suggests: broom,
+    knitr,
+    rmarkdown,
+    tidyverse
+VignetteBuilder: knitr
+RoxygenNote: 7.2.3
