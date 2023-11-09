@@ -20,6 +20,8 @@
 #' necessary (default = TRUE).
 #'
 #' @return a character string containing XML code.
+#'
+#' @export
 wildcards_mxml <- function(data, shared = TRUE){
   # replicated shared value as needed
   shared <- rep_len(shared, length.out = ncol(data))

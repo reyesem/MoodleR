@@ -3,4 +3,5 @@
 export(generate_rcode)
 export(generate_wildcards)
 export(html_to_moodle)
+export(wildcards_mxml)
 importFrom(rlang,"!!")
