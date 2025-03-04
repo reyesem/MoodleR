@@ -6,7 +6,8 @@
 \usage{
 generate_rcode(
   df.fct,
-  cols = NULL,
+  cols,
+  chars,
   name = "df",
   type = c("tibble", "data.frame")
 )
@@ -17,6 +18,10 @@ to a student. This function should not take any parameters.}
 
 \item{cols}{columns in the result of \code{df.fct} that should not be
 considered wildcards. Takes any form of \code{dplyr::tidyselect}.}
+
+\item{chars}{wildcard columns that should be considered character variables.
+Takes any form of \code{dplyr::tidyselect}.  Default is to assume all
+wildcards are numeric.}
 
 \item{name}{the name of the resulting dataset (default = \code{"df"}).}
 

@@ -18,28 +18,26 @@
 #'
 #' @return a dataframe that contains all the wildcards and their values.
 #'
-#' @importFrom rlang !!
 #' @export
-generate_wildcards <- function(df.fct, soln.fct, replicates = 50, cols = NULL){
+generate_wildcards <- function(df.fct, soln.fct, replicates = 50, cols) {
   if (replicates > 50) replicates <- 50
 
   dfList <- lapply(seq_len(replicates), function(u) df.fct())
 
   solns <- purrr::map(dfList, soln.fct) |>
-    do.call(what = "rbind") |>
+    do.call(what = 'rbind') |>
     tibble::as_tibble()
 
-  if (!is.null(substitute(cols))){
-    dfList <- purrr::map(dfList,
-                         function(df){
-                           cols <- dplyr::enquo(cols)
-                           dplyr::select(df, -(!! cols))
-                         })
+  if (!missing(cols)) {
+    dfList <- dfList |>
+      purrr::map(function(df) {
+        dplyr::select(df, -{{ cols }})
+      })
   }
 
   out <- purrr::map(
     dfList,
-    function(df){
+    function(df) {
       df <- df |>
         dplyr::mutate(.names = seq_len(nrow(df)))
 
@@ -48,17 +46,14 @@ generate_wildcards <- function(df.fct, soln.fct, replicates = 50, cols = NULL){
           names_from = '.names',
           values_from = -'.names',
           names_prefix = ifelse(ncol(df) == 2,
-                                paste0(colnames(df)[1], "_"), "")
+                                paste0(colnames(df)[1], '_'), '')
         )
     }
   ) |>
     purrr::list_rbind()
 
-  out <- dplyr::bind_cols(out, solns)
-
-  out
+  dplyr::bind_cols(out, solns)
 }
-
 
 
 #' Generate r code text given a template.
@@ -76,49 +71,51 @@ generate_wildcards <- function(df.fct, soln.fct, replicates = 50, cols = NULL){
 #' to a student. This function should not take any parameters.
 #' @param cols columns in the result of \code{df.fct} that should not be
 #' considered wildcards. Takes any form of \code{dplyr::tidyselect}.
+#' @param chars wildcard columns that should be considered character variables.
+#' Takes any form of \code{dplyr::tidyselect}.  Default is to assume all
+#' wildcards are numeric.
 #' @param name the name of the resulting dataset (default = \code{"df"}).
 #' @param type one of \code{"tibble"} or \code{"data.frame"} that specifies the
 #' type of output that should be created from the code.
 #'
 #' @return invisible
 #'
-#' @importFrom rlang !!
 #' @export
-generate_rcode <- function(df.fct, cols = NULL, name = "df",
-                           type = c("tibble", "data.frame")){
+generate_rcode <- function(df.fct, cols, chars, name = 'df',
+                           type = c('tibble', 'data.frame')) {
   type <- match.arg(type)
 
   df <- df.fct()
 
-  .mynames <- function(u){
-    paste0("{", substitute(u), "_", seq_along(u), "}")
+  .mynames <- function(u) {
+    paste0('{', substitute(u), '_', seq_along(u), '}')
   }
 
-  .convert <- function(u){
-    if (is.numeric(u) || is.logical(u)){
+  .convert <- function(u) {
+    if (is.numeric(u) || is.logical(u)) {
       return(u)
-    } else if (is.character(u) || is.factor(u)){
-      out <- paste0('"', u, '"')
-      return(out)
+    } else if (is.character(u) || is.factor(u)) {
+      return(paste0('"', u, '"'))
     }
   }
 
-  if (is.null(substitute(cols))){
+  if (missing(cols)) {
     df <- df |>
-      dplyr::mutate_all(.mynames)
+      dplyr::mutate(dplyr::across(tidyselect::everything(), .mynames))
   } else {
-    cols <- dplyr::enquo(cols)
-    keep <- dplyr::vars(!! cols)
-    wild <- dplyr::vars(-(!! cols))
-
     df <- df |>
-      dplyr::mutate(dplyr::across(wild, .mynames)) |>
-      dplyr::mutate(dplyr::across(keep, .convert))
+      dplyr::mutate(dplyr::across(tidyselect::everything(), .convert)) |>
+      dplyr::mutate(dplyr::across(-{{ cols }}, .mynames))
+  }
+
+  if (!missing(chars)) {
+    df <- df |>
+      dplyr::mutate(dplyr::across({{ chars }}, .convert))
   }
 
   out <- purrr::map_chr(
     df,
-    function(u){
+    function(u) {
       paste0('c(', paste0(u, collapse = ', '), ')')
     }
   )

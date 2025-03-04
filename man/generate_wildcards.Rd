@@ -4,7 +4,7 @@
 \alias{generate_wildcards}
 \title{Generate wildcard datasets given a template.}
 \usage{
-generate_wildcards(df.fct, soln.fct, replicates = 50, cols = NULL)
+generate_wildcards(df.fct, soln.fct, replicates = 50, cols)
 }
 \arguments{
 \item{df.fct}{Function which generates a single dataset that could be given
