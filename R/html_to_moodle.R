@@ -49,6 +49,7 @@ html_to_moodle <- function(file){
 
     fullq <- switch(type,
                     "calculated" = mxml_read_calculated(q, opts),
+                    "cloze" = mxml_read_cloze(q, opts),
                     "description" = mxml_read_description(q),
                     "essay" = mxml_read_essay(q, opts),
                     "matching" = mxml_read_matching(q, opts),

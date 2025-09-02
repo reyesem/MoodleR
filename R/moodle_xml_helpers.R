@@ -233,6 +233,45 @@ mxml_read_calculated <- function(node, opts){
 
 
 
+#' Convert HTML output for Cloze Questions into Moodle XML.
+#'
+#' HTML code generated from knitting together an RMarkdown document which
+#' corresponds to a Description Question is converted to Moodle XML. This is
+#' called from within \code{\link{html_to_moodle}}.
+#'
+#'
+#' @param node the section of html code corresponding to the description
+#' question.
+#'
+#' @return an XML node to be inserted into a document.
+mxml_read_cloze <- function(node, opts){
+  .full <- mxml_create_basic(node, "cloze")
+
+  opts <- xmloption(names(opts), opts) |>
+    lapply(html2xml)
+  for (o in opts) xml2::xml_add_child(.full, o)
+
+  hints <- node |>
+    rvest::html_elements('.hint')
+
+  if (length(hints) > 0){
+    hints <- hints |>
+      lapply(function(u){
+        u |>
+          rvest::html_children() |>
+          cdata_it() |>
+          type_text(type = "hint") |>
+          html2xml()
+      })
+
+    for (h in hints) xml2::xml_add_child(.full, h)
+  }
+
+  .full
+}
+
+
+
 
 #' Convert HTML output for Description Questions into Moodle XML.
 #'

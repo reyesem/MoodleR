@@ -143,6 +143,24 @@ word_create_calculated <- function(node, qnumber, solution, seed){
 
 
 
+#' Convert Moodle XML of cloze questions into word format.
+#'
+#' Moodle XML code that creates a question is converted to markdown syntax for
+#' writing to Microsoft Word.
+#'
+#'
+#' @param node the section of html code corresponding to the question.
+#' @param qnumber the question number to include.
+#' @param solution a boolean indicating whether the solution/feedback should be
+#' printed.
+#'
+#' @return a string of markdown text.
+word_create_cloze <- function(node, qnumber, solution){
+  word_create_basic(node, qnumber, solution)
+}
+
+
+
 #' Convert Moodle XML of description questions into word format.
 #'
 #' Moodle XML code that creates a question is converted to markdown syntax for

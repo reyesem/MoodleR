@@ -42,6 +42,7 @@ moodle_to_word <- function(file,
 
     fullq <- switch(type,
                     "calculated" = word_create_calculated(q, qnumber, solution, myseed),
+                    "cloze" = word_create_cloze(q, qnumber, solution),
                     "description" = word_create_description(q),
                     "essay" = word_create_essay(q, qnumber, solution),
                     "matching" = word_create_matching(q, qnumber, solution),

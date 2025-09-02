@@ -48,6 +48,7 @@ type_text <- function(code, type, format = "html"){
 # ---- default_options ----
 # Description: Set default options for each question type.
 default_options <- function(type = c("calculated",
+                                     "cloze",
                                      "essay",
                                      "matching",
                                      "ddmatch",
@@ -64,6 +65,11 @@ default_options <- function(type = c("calculated",
       'unitpenalty' = '0.1',
       'showunits' = '3',
       'unitsleft' = '0'
+    )
+  } else if (type == 'cloze'){
+    out <- c(
+      'penalty' = '0',
+      'defaultgrade' = '1'
     )
   } else if (type == 'essay') {
     out <- c(
